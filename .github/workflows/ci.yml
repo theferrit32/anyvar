@@ -1,0 +1,103 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version:
+          - "3.11"
+          - "3.12"
+          - "3.13"
+    steps:
+      - uses: actions/checkout@v4
+
+      # Python setup with uv
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+          cache-dependency-glob: '**/pyproject.toml'
+      - name: Setup venv
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv pip install '.[dev,test,duckdb,queueing,snowflake,postgres]'
+
+      - name: Check format
+        run: uv run ruff format --check
+
+      - name: Check style
+        run: uv run ruff check
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    # Only run this job if the lint job is successful
+    needs: lint
+    # Postgresql service
+    # https://docs.github.com/en/actions/use-cases-and-examples/using-containerized-services/creating-postgresql-service-containers
+    env:
+      # auto-authenticate the `psql` CLI
+      PGPASSWORD: postgres
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+        # Set health checks to wait until postgres is ready
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          # Map tcp port 5432 on service container to the host
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Python setup with uv
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.11'
+          enable-cache: true
+          cache-dependency-glob: '**/pyproject.toml'
+      - name: Setup venv
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv pip install '.[dev,test,duckdb,queueing,snowflake,postgres]'
+
+      # https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions#example-using-a-docker-hub-action
+      - name: Run anyvar postgres init script
+        uses: docker://alpine/psql:latest
+        with:
+          entrypoint: 'psql'
+          args: >-
+            -h postgres -U postgres -d postgres
+            -p 5432 -f ./src/anyvar/storage/postgres_init_test.sql
+
+      - name: Run tests
+        run: >-
+          uv run pytest -vvv
+            --ignore tests/test_vcf.py
+            --ignore tests/test_variation.py::test_put_allele
+            --ignore tests/test_variation.py::test_put_copy_number
+            --ignore tests/test_search.py::test_search
+            --ignore tests/storage/test_sql_storage_mapping.py::test_iter
+            --ignore tests/storage/test_sql_storage_mapping.py::test_setitem

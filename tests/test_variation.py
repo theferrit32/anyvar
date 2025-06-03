@@ -14,11 +14,14 @@ def copy_numbers(test_data_dir) -> dict:
         return json.load(f)["copy_numbers"]
 
 
+@pytest.mark.vcr
 def test_put_allele(client, alleles):
     for allele_id, allele in alleles.items():
         resp = client.put("/variation", json=allele["params"])
         assert resp.status_code == HTTPStatus.OK
-        assert resp.json()["object"]["id"] == allele_id
+        resp_json = resp.json()
+        assert len(resp_json["messages"]) == 0
+        assert resp_json["object"]["id"] == allele_id
 
     # confirm idempotency
     first_id, first_allele = next(iter(alleles.items()))
