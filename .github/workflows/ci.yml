@@ -21,24 +21,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Python setup with uv
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
+      # Python setup with pip
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          enable-cache: true
-          cache-dependency-glob: '**/pyproject.toml'
-      - name: Setup venv
-        run: uv venv
+          cache: 'pip'
+          cache-dependency-path: '**/pyproject.toml'
 
       - name: Install dependencies
-        run: uv pip install '.[dev,test,duckdb,queueing,snowflake,postgres]'
+        run: pip install '.[dev,test,duckdb,queueing,snowflake,postgres]'
 
       - name: Check format
-        run: uv run ruff format --check
+        run: ruff format --check
 
       - name: Check style
-        run: uv run ruff check
+        run: ruff check
 
   test:
     name: test
@@ -70,18 +68,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Python setup with uv
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
+      # Python setup with pip
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          enable-cache: true
-          cache-dependency-glob: '**/pyproject.toml'
-      - name: Setup venv
-        run: uv venv
+          cache: 'pip'
+          cache-dependency-path: '**/pyproject.toml'
 
       - name: Install dependencies
-        run: uv pip install '.[dev,test,duckdb,queueing,snowflake,postgres]'
+        run: pip install '.[dev,test,duckdb,queueing,snowflake,postgres]'
 
       # https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions#example-using-a-docker-hub-action
       - name: Run anyvar postgres init script
@@ -94,7 +90,7 @@ jobs:
 
       - name: Run tests
         run: >-
-          uv run pytest -vvv
+          pytest -vvv
             --ignore tests/test_vcf.py
             --ignore tests/test_variation.py::test_put_allele
             --ignore tests/test_variation.py::test_put_copy_number
