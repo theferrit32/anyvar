@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 
 import pytest
-import vcr
 from fastapi.testclient import TestClient
 
 from anyvar.anyvar import AnyVar, create_storage, create_translator
