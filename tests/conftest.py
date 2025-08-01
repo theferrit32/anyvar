@@ -11,6 +11,31 @@ from anyvar.restapi.main import app as anyvar_restapi
 pytest_plugins = ("celery.contrib.pytest",)
 
 
+def record_request_filter(request):
+    """
+    before_record_request hook for VCR.py to filter which requests to record.
+    We only want to record external requests, not those to AnyVar itself.
+    """
+    matchers = [
+        lambda r: r.path.startswith("/seqrepo/"),
+        lambda r: r.host == "eutils.ncbi.nlm.nih.gov",
+    ]
+    for matcher in matchers:
+        if matcher(request):
+            return request
+    # Reeturn None to not record the request
+    return None
+
+
+@pytest.fixture(scope="session")
+def vcr_config():
+    return {
+        "before_record_request": record_request_filter,
+        "record_mode": "new_episodes",
+        "cassette_library_dir": str(Path(__file__).parent / "cassettes"),
+    }
+
+
 def pytest_collection_modifyitems(items):
     """Modify test items in place to ensure test modules run in a given order."""
     module_order = [
@@ -19,7 +44,8 @@ def pytest_collection_modifyitems(items):
         "test_general",
         "test_location",
         "test_search",
-        "test_vcf",
+        "test_annotate_vcf",
+        "test_ingest_vcf",
         "test_sql_storage_mapping",
         "test_postgres",
         "test_duckdb",
